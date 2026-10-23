@@ -90,14 +90,51 @@ def wyckoff_signal_for_timeframe(symbol, quote, bars, tf_name):
     recent_high = max(highs[-20:]); recent_low = min(lows[-20:])
     avg_volume = sum(volumes[-20:]) / 20 if volumes else 0
     current_volume = volumes[-1] if volumes else 0
-    price_near_low = current_price <= recent_low * 1.02
-    volume_high = current_volume > avg_volume * 1.5 if avg_volume > 0 else False
-    if price_near_low and volume_high and closes[-1] > closes[-2]:
-        return "LONG", f"{tf_name} Spring/SOS near support ({recent_low:.2f})"
-    price_near_high = current_price >= recent_high * 0.98
-    if price_near_high and volume_high and closes[-1] < closes[-2]:
-        return "SHORT", f"{tf_name} Upthrust/SOW near resistance ({recent_high:.2f})"
-    return "NEUTRAL", f"{tf_name} No clear pattern"
+    price_near_low = current_price <= recent_low * 1.03   # widened from 2% to 3%
+    volume_high = current_volume > avg_volume * 1.3 if avg_volume > 0 else False  # lowered from 1.5x
+    rsi = _rsi(closes, 14)
+    rsi_oversold = rsi is not None and rsi < 35
+    rsi_overbought = rsi is not None and rsi > 65
+    vol_divergence = _volume_divergence(closes, volumes)
+    if price_near_low and (volume_high or rsi_oversold) and closes[-1] > closes[-2]:
+        tag = "Spring/SOS"
+        if rsi_oversold: tag += "+RSI"
+        if vol_divergence: tag += "+VolDiv"
+        return "LONG", f"{tf_name} {tag} near support ({recent_low:.2f})"
+    price_near_high = current_price >= recent_high * 0.97
+    if price_near_high and (volume_high or rsi_overbought) and closes[-1] < closes[-2]:
+        tag = "Upthrust/SOW"
+        if rsi_overbought: tag += "+RSI"
+        return "SHORT", f"{tf_name} {tag} near resistance ({recent_high:.2f})"
+    if rsi_oversold and price_near_low:
+        return "LONG", f"{tf_name} RSI oversold ({rsi:.0f}) near support ({recent_low:.2f})"
+    if rsi_overbought and price_near_high:
+        return "SHORT", f"{tf_name} RSI overbought ({rsi:.0f}) near resistance ({recent_high:.2f})"
+    return "NEUTRAL", f"{tf_name} No clear pattern (RSI={rsi:.0f})" if rsi is not None else f"{tf_name} No clear pattern"
+
+def _rsi(closes, period=14):
+    if len(closes) < period + 1:
+        return None
+    gains, losses = [], []
+    for i in range(1, period + 1):
+        d = closes[-period - 1 + i] - closes[-period - 2 + i]
+        gains.append(max(d, 0)); losses.append(max(-d, 0))
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+def _volume_divergence(closes, volumes, n=5):
+    """True if recent down bars show decreasing volume (accumulation)."""
+    if len(closes) < n + 1 or len(volumes) < n + 1:
+        return False
+    down_bars = [i for i in range(-n, 0) if closes[i] < closes[i-1]]
+    if len(down_bars) < 2:
+        return False
+    vols = [volumes[i] for i in down_bars]
+    return vols[-1] < vols[0]
 
 def analyze_wyckoff_multitf(symbol, quote, all_bars):
     tf_signals = {}
@@ -107,16 +144,13 @@ def analyze_wyckoff_multitf(symbol, quote, all_bars):
         tf_signals[tf_name] = signal
     long_count = sum(1 for s in tf_signals.values() if s == "LONG")
     short_count = sum(1 for s in tf_signals.values() if s == "SHORT")
-    if long_count >= 2:
-        return "LONG", f"Multi-TF LONG ({long_count}/3)", tf_signals
-    elif short_count >= 2:
-        return "SHORT", f"Multi-TF SHORT ({short_count}/3)", tf_signals
-    elif long_count == 1:
+    # AGGRESSIVE: single timeframe is enough
+    if long_count >= 1:
         tf = [k for k, v in tf_signals.items() if v == "LONG"][0]
-        return "LONG", f"{tf.title()} LONG only", tf_signals
-    elif short_count == 1:
+        return "LONG", f"{tf.title()} LONG ({long_count}/3 TFs)", tf_signals
+    elif short_count >= 1:
         tf = [k for k, v in tf_signals.items() if v == "SHORT"][0]
-        return "SHORT", f"{tf.title()} SHORT only", tf_signals
+        return "SHORT", f"{tf.title()} SHORT ({short_count}/3 TFs)", tf_signals
     else:
         return "NEUTRAL", "No Wyckoff pattern across timeframes", tf_signals
 
@@ -257,5 +291,3 @@ def run_trade_cycle():
 
 if __name__ == "__main__":
     run_trade_cycle()
-PYEOF
-echo "trade_cycle.py written"
