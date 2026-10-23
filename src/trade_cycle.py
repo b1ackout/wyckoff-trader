@@ -222,7 +222,10 @@ def place_market_order(app, symbol, notional, action, price):
     order = Order()
     order.action = action
     order.orderType = "LMT"
-    order.lmtPrice = round(price * 1.005, 2)   # limit 0.5% through, avoids slippage
+    if action == "BUY":
+        order.lmtPrice = round(price * 1.005, 2)   # limit 0.5% above, avoids slippage
+    else:
+        order.lmtPrice = round(price * 0.995, 2)   # limit 0.5% below for short sells
     order.totalQuantity = quantity
     order.eTradeOnly = False
     order.firmQuoteOnly = False
@@ -278,6 +281,11 @@ def run_trade_cycle():
                 trades_to_place.append((symbol, DAY_TRADE_STOCKS[symbol], "BUY"))
             elif symbol in SWING_TRADE_STOCKS:
                 trades_to_place.append((symbol, SWING_TRADE_STOCKS[symbol], "BUY"))
+        elif signal == "SHORT":
+            if symbol in DAY_TRADE_STOCKS:
+                trades_to_place.append((symbol, DAY_TRADE_STOCKS[symbol], "SELL"))
+            elif symbol in SWING_TRADE_STOCKS:
+                trades_to_place.append((symbol, SWING_TRADE_STOCKS[symbol], "SELL"))
     if trades_to_place:
         log.info(f"\nPlacing {len(trades_to_place)} trade(s)...")
         for symbol, qty, action in trades_to_place:
