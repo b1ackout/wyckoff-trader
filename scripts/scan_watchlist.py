@@ -152,7 +152,7 @@ def main():
     print(f"Quote quality: {valid_quotes}/{len(symbols)} valid; {stale_quotes} stale (>15m); {wide_quotes} wide (>1%).")
     if caveats:
         print("Signal quote caveats:", ", ".join(caveats))
-    print("P/E was not reverified. No orders were placed, modified, or canceled.")
+    print("P/E is not checked in this 30-minute signal scan; see the separate daily review for timestamped fundamental checks. No orders were placed, modified, or canceled.")
     return 2 if len(missing) == len(symbols) else 0
 
 
