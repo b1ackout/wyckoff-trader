@@ -1,0 +1,5 @@
+Read-only Wyckoff signal scan for the canonical watchlist.
+
+Use /home/deck/.openclaw/state/venvs/wyckoff/bin/python3 and /home/deck/.openclaw/workspace/wyckoff-trader/src/trade_cycle.py. Import the module and iterate its current WATCHLIST constant; never hard-code a subset. Fetch Alpaca quotes and fetch_all_timeframes(symbol) for each symbol; process symbols independently and pass the full daily/weekly/monthly bars dict into analyze_wyckoff_multitf(symbol, quote, all_bars). Latest daily close is all_bars['daily'][-1]['c'] when present.
+
+Report all verified LONG/SHORT signals with timeframe consensus, latest daily close, quote bid/ask/timestamp, and quote-spread caveats. State data gaps or exceptions per ticker and continue. Do not claim P/E was reverified unless fetched. Quotes that are stale, missing, zero, or wider than 1% are not execution references. This scan is read-only: do not invoke run_trade_cycle or any order-submitting function; never place, modify, or cancel orders. Return concise final text and let the automation's configured Discord delivery handle posting; do not call the message tool.

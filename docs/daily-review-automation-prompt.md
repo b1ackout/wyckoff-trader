@@ -1,0 +1,16 @@
+Daily ticker universe research — run once per scheduled invocation.
+
+Scope
+- Repository: /home/deck/.openclaw/workspace/wyckoff-trader
+- Canonical list and trade buckets: src/trade_cycle.py
+- Paper account only; this task researches and edits the watchlist, never trades.
+
+Research procedure
+1. Read current WATCHLIST, DAY_TRADE_STOCKS, SWING_TRADE_STOCKS, README, and the latest docs/ticker-review-*.md. Treat WATCHLIST as the single source of truth; do not hard-code an older subset.
+2. Re-evaluate every listed symbol and a reasonable broad US-exchange-listed candidate pool. Use current Yahoo/yfinance trailing P/E, forward P/E, liquidity, earnings/FCF, debt/cash, recent official quarterly releases, news catalysts, and key downside risks. Cite issuer/SEC links in the dated review note. Clearly label vendor estimates, stale/missing data, and one-off or negative EPS.
+3. Apply the standing screen: US exchange-listed common shares/ADRs, positive trailing earnings with TTM P/E below 15, adequate liquidity (prefer >=$10M average daily dollar volume), and a defensible business/earnings thesis. Forward P/E alone does not satisfy the trailing P/E screen. Score valuation, financial quality, catalyst, liquidity/quote quality, and sector concentration; avoid replacing a name just to create activity.
+4. Before recommending a removal, query the IBKR paper account at 127.0.0.1:7497 read-only for positions and broker open orders. Use /home/deck/.openclaw/state/venvs/wyckoff/bin/python3 and capture actual openOrder inventory; orderStatus callbacks alone are not an open-order list. If broker state or data is unavailable, retain existing symbols and report the blocker rather than risk orphaning held exposure.
+5. Never place, modify, or cancel orders; never liquidate holdings. Keep any ticker with a current position or open order in the list as position-locked until flat. Do not change strategy thresholds, order types, quote gate, day/swing assignment of existing names, or sizing.
+6. Keep the universe at or below 30 unique symbols. Remove only unheld/unordered names with a documented reason. Add only candidates that pass the screen; put new long-term candidates in SWING_TRADE_STOCKS at the existing 30000 notional per symbol. Maintain exactly one trade-bucket mapping for each watched symbol; do not increase day or swing notional.
+7. If changes are justified, update WATCHLIST and the relevant map in src/trade_cycle.py, update README, and save a dated matrix/report under docs with metrics, rationale, risks, quote caveats, sources, and removed/added names. Run a Python syntax check and validate count <=30, uniqueness, and complete bucket coverage. If nothing qualifies, leave code unchanged and record no change.
+8. Return a concise report of the review, any list changes, live-position-locked names, source/data caveats, and verification. Do not use the message tool; the scheduler's configured delivery sends the final response to Discord. Never include credentials.

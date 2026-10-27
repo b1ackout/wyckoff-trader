@@ -15,5 +15,7 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 /tmp/ibapi_env/bin/python3 src/trade_cycle.py
 ```
 
-## Watchlist (22 names, P/E < 15)
-PYPL, DHI, EQNR, EOG, B, PDD, CVE, UBER, VZ, CMCSA, F, GM, INTC, BAC, WFC, XOM, CVX, T, JPM, MO, KHC, PCG
+## Watchlist (30 US-listed names)
+PYPL, DHI, EQNR, EOG, B, PDD, CVE, UBER, VZ, CMCSA, F, GM, INTC, BAC, WFC, XOM, CVX, T, JPM, MO, KHC, PCG, BMY, CI, HPQ, TROW, TRV, CF, PHM, AIZ
+
+The eight October 2026 research additions are assigned to the swing-trade bucket at the existing $30,000 per-symbol notional. Screening details, current valuation snapshot, source links, and risks are in `docs/ticker-review-2026-10-27.md`. The daily research automation is intended to re-evaluate this list and keep it at or below 30; it does not place orders or liquidate held positions.
