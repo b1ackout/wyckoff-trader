@@ -7,13 +7,16 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 
 ## Layout
 - `src/trade_cycle.py` — single trade cycle (Alpaca quotes + multi-TF Wyckoff + IBKR orders)
-- `scripts/scanner.py` — broad-universe Wyckoff pattern scanner
+- `scripts/scan_watchlist.py` — batched, read-only multi-timeframe scan for all 30 watchlist names
 - `docs/notes.md` — trade-cycle log and observations
 
 ## Run
 ```bash
-/tmp/ibapi_env/bin/python3 src/trade_cycle.py
+/home/deck/.openclaw/state/venvs/wyckoff/bin/python3 src/trade_cycle.py
+/home/deck/.openclaw/state/venvs/wyckoff/bin/python3 scripts/scan_watchlist.py
 ```
+
+The read-only scan batches daily, weekly, and monthly Yahoo Finance bars for the full watchlist, and retrieves Alpaca quotes in one request. This avoids the timeout caused by sequential per-symbol requests. It never places or changes orders.
 
 ## Watchlist (30 US-listed names)
 PYPL, DHI, EQNR, EOG, B, PDD, CVE, UBER, VZ, CMCSA, F, GM, INTC, BAC, WFC, XOM, CVX, T, JPM, MO, KHC, PCG, BMY, CI, HPQ, TROW, TRV, CF, PHM, AIZ
