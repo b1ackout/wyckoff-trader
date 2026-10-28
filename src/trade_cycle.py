@@ -206,40 +206,6 @@ def connect_ibkr():
     time.sleep(2)
     return app
 
-NOTIONAL_PER_NAME = 30000.0  # EUR per position
-
-def place_market_order(app, symbol, notional, action, price):
-    """notional is a CASH amount; price is the reference entry price."""
-    if not price or price <= 0:
-        log.error(f"  {symbol:6s} | no usable price — order skipped (SAFETY)")
-        return None
-    quantity = int(notional // price)
-    if quantity < 1:
-        log.error(f"  {symbol:6s} | notional {notional:.0f} < 1 share @ {price:.2f} — skipped (SAFETY)")
-        return None
-    contract = Contract()
-    contract.symbol = symbol
-    contract.secType = "STK"
-    contract.exchange = "SMART"
-    contract.currency = "USD"
-    order = Order()
-    order.action = action
-    order.orderType = "LMT"
-    if action == "BUY":
-        order.lmtPrice = round(price * 1.005, 2)   # limit 0.5% above, avoids slippage
-    else:
-        order.lmtPrice = round(price * 0.995, 2)   # limit 0.5% below for short sells
-    order.totalQuantity = quantity
-    order.eTradeOnly = False
-    order.firmQuoteOnly = False
-    order.tif = "DAY"
-    order_id = app.next_order_id
-    app.next_order_id += 1
-    app.placeOrder(order_id, contract, order)
-    log.info(f"Placed {action} {quantity} {symbol} @ LMT {order.lmtPrice} (orderId={order_id})")
-    time.sleep(3)
-    return order_id
-
 def log_to_notes(message):
     try:
         with open(NOTES_FILE, "a") as f:
@@ -249,56 +215,12 @@ def log_to_notes(message):
 
 # --- Main trade cycle ------------------------------------------------------
 def run_trade_cycle():
-    log.info("=" * 70)
-    log.info("WYCKOFF TRADE CYCLE — MULTI-TF ANALYSIS + ALPACA + IBKR EXECUTION")
-    log.info("=" * 70)
-    log.info("\nFetching quotes from Alpaca...")
-    quotes = get_alpaca_quotes(WATCHLIST)
-    if not quotes:
-        log.error("No quotes received from Alpaca")
-        return
-    log.info("\nFetching daily/weekly/monthly bars for Wyckoff analysis...")
-    all_bars = {}
-    for symbol in WATCHLIST:
-        all_bars[symbol] = fetch_all_timeframes(symbol)
-        d, w, m = len(all_bars[symbol]["daily"]), len(all_bars[symbol]["weekly"]), len(all_bars[symbol]["monthly"])
-        log.info(f"  {symbol:6s} | D:{d} W:{w} M:{m}")
-    log.info("\nConnecting to IBKR TWS...")
-    app = connect_ibkr()
-    if not app:
-        log.error("Cannot connect to IBKR TWS")
-        return
-    nav = app.account_summary.get("$LEDGER-NetLiquidationByCurrency", "N/A")
-    cash = app.account_summary.get("$LEDGER-CashBalance", "N/A")
-    log.info(f"\nAccount: NAV={nav}, Cash={cash}")
-    log.info("\nWyckoff Analysis (Multi-Timeframe):")
-    trades_to_place = []
-    for symbol in WATCHLIST:
-        q = quotes.get(symbol, {})
-        bars = all_bars.get(symbol, {})
-        signal, reason, tf_signals = analyze_wyckoff_multitf(symbol, q, bars)
-        log.info(f"  {symbol:6s} | {signal:6s} | {reason}")
-        log.info(f"           | Daily: {tf_signals.get('daily', 'N/A'):6s} | Weekly: {tf_signals.get('weekly', 'N/A'):6s} | Monthly: {tf_signals.get('monthly', 'N/A'):6s}")
-        if signal == "LONG":
-            if symbol in DAY_TRADE_STOCKS:
-                trades_to_place.append((symbol, DAY_TRADE_STOCKS[symbol], "BUY"))
-            elif symbol in SWING_TRADE_STOCKS:
-                trades_to_place.append((symbol, SWING_TRADE_STOCKS[symbol], "BUY"))
-        elif signal == "SHORT":
-            if symbol in DAY_TRADE_STOCKS:
-                trades_to_place.append((symbol, DAY_TRADE_STOCKS[symbol], "SELL"))
-            elif symbol in SWING_TRADE_STOCKS:
-                trades_to_place.append((symbol, SWING_TRADE_STOCKS[symbol], "SELL"))
-    if trades_to_place:
-        log.info(f"\nPlacing {len(trades_to_place)} trade(s)...")
-        for symbol, qty, action in trades_to_place:
-            place_market_order(app, symbol, qty, action, quotes.get(symbol, {}).get("last", 0))
-            log_to_notes(f"TRADE: {action} {qty} {symbol} @ LMT — Wyckoff multi-TF signal")
-    else:
-        log.info("\nNo Wyckoff signals triggered — no trades placed")
-    app.disconnect()
-    log.info("\nTrade cycle complete")
-    log.info("=" * 70)
+    """Guarded paper exits only; new entries require approved portfolio risk caps."""
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from manage_positions import run
+    return run(execute=True)
+
 
 if __name__ == "__main__":
-    run_trade_cycle()
+    raise SystemExit(run_trade_cycle())

@@ -6,8 +6,9 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 - Execution: IBKR TWS Classic on 127.0.0.1:7497 (paper account)
 
 ## Layout
-- `src/trade_cycle.py` — single trade cycle (Alpaca quotes + multi-TF Wyckoff + IBKR orders)
+- `src/trade_cycle.py` — Wyckoff signal analysis and guarded paper-exit entry point (new entries disabled)
 - `scripts/scan_watchlist.py` — batched, read-only multi-timeframe scan for all 30 watchlist names
+- `scripts/manage_positions.py` — position-aware paper exits; dry-run default, `--execute` for guarded exits
 - `docs/notes.md` — trade-cycle log and observations
 
 ## Run
@@ -22,3 +23,6 @@ The read-only scan batches daily, weekly, and monthly Yahoo Finance bars for the
 PYPL, DHI, EQNR, EOG, B, PDD, CVE, UBER, VZ, CMCSA, F, GM, INTC, BAC, WFC, XOM, CVX, T, JPM, MO, KHC, PCG, BMY, CI, HPQ, TROW, TRV, CF, PHM, AIZ
 
 The eight October 2026 research additions are assigned to the swing-trade bucket at the existing $30,000 per-symbol notional. Screening details, current valuation snapshot, source links, and risks are in `docs/ticker-review-2026-10-27.md`. The daily research automation is intended to re-evaluate this list and keep it at or below 30; it does not place orders or liquidate held positions.
+
+## Exit policy (paper account only)
+The position manager closes an existing stock position on an 8% adverse move, a 12% favorable move from broker average cost, or two opposing timeframe signals. These are full closes, never automatic reversals or repeated partial trims. It requires verified paper-account positions and open orders, a fresh quote with <=1% spread and within 2% of daily close, US regular session 09:35–15:55 ET, and no pending order. It submits at most one DAY limit close ticket per invocation and awaits order status. The thresholds are decision rules, not resting broker stops; gaps may exceed them. New entries, time-based exits and automated earnings exits are disabled pending approved risk caps and reliable entry/event metadata.
