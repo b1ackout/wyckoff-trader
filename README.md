@@ -9,6 +9,7 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 - `src/trade_cycle.py` — Wyckoff signal analysis and guarded paper-exit entry point (new entries disabled)
 - `scripts/scan_watchlist.py` — batched, read-only multi-timeframe scan for all 30 watchlist names
 - `scripts/manage_positions.py` — position-aware paper exits; dry-run default, `--execute` for guarded exits
+- `scripts/scheduled_check.py` — scheduled scan/exit wrapper; reports broker outages without disabling future scans
 - `docs/notes.md` — trade-cycle log and observations
 
 ## Run
