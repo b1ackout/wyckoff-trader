@@ -12,7 +12,7 @@ KNOWN_BROKER_BLOCKS = (
 )
 
 
-def run_script(name, args=(), timeout=90):
+def run_script(name, args=(), timeout=45):
     try:
         return subprocess.run([PYTHON, str(ROOT / "scripts" / name), *args],
                               capture_output=True, text=True, timeout=timeout, check=False)
@@ -32,7 +32,31 @@ def main():
     if manager is None: return 2
     print("=== PAPER EXIT MANAGER ===")
     print(manager.stdout.strip())
-    if manager.returncode == 0: return 0
+    if manager.returncode == 0:
+        # Avoid opening a new experiment position in a cycle that just closed one.
+        if "ORDER " in manager.stdout or "ORDER STATUS UNKNOWN" in manager.stdout:
+            print("ENTRY_SKIP: broker exit action requires reconciliation first")
+            return 0
+        entry = run_script("experiment_entry.py", ("--auto", "--execute"))
+        if entry is None: return 2
+        print("=== WYCKOFF RISK-025 PILOT ENTRY ===")
+        print(entry.stdout.strip())
+        if entry.returncode == 0:
+            shadow = run_script("shadow_experiments.py", timeout=25)
+            print("=== SHADOW STRATEGY SIGNALS (NO ORDERS) ===")
+            if shadow is None:
+                print("SHADOW_UNAVAILABLE: market data timed out; paper exit/entry results above remain valid")
+            elif shadow.returncode:
+                print("SHADOW_UNAVAILABLE:", shadow.stderr[-300:])
+            else:
+                print(shadow.stdout.strip())
+            return 0
+        if any(reason in entry.stdout for reason in KNOWN_BROKER_BLOCKS) and "ORDER STATUS UNKNOWN" not in entry.stdout:
+            print("BROKER_UNAVAILABLE: no pilot entry; next scan remains scheduled.")
+            return 0
+        print("ENTRY_FAILED: inspect TWS orders before retrying.")
+        print(entry.stderr[-1000:])
+        return 2
     if any(reason in manager.stdout for reason in KNOWN_BROKER_BLOCKS) and "ORDER STATUS UNKNOWN" not in manager.stdout:
         print("BROKER_UNAVAILABLE: no order submitted; scan continues next run. Restore TWS for exits.")
         return 0

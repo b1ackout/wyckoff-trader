@@ -6,10 +6,12 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 - Execution: IBKR TWS Classic on 127.0.0.1:7497 (paper account)
 
 ## Layout
-- `src/trade_cycle.py` — Wyckoff signal analysis and guarded paper-exit entry point (new entries disabled)
+- `src/trade_cycle.py` — Wyckoff signal analysis and guarded paper-exit entry point (legacy unbounded entries disabled)
 - `scripts/scan_watchlist.py` — batched, read-only multi-timeframe scan for all 30 watchlist names
 - `scripts/manage_positions.py` — position-aware paper exits; dry-run default, `--execute` for guarded exits
-- `scripts/scheduled_check.py` — scheduled scan/exit wrapper; reports broker outages without disabling future scans
+- `scripts/scheduled_check.py` — scheduled scan/exit/pilot-entry wrapper; reports broker outages without disabling future scans
+- `scripts/experiment_entry.py` — tagged, capped paper-only Wyckoff pilot entry (dry-run default; `--auto --execute` for guarded scheduled pilot)
+- `scripts/shadow_experiments.py` — read-only intraday momentum and mean-reversion signals; no broker orders
 - `docs/notes.md` — trade-cycle log and observations
 
 ## Run
@@ -26,7 +28,10 @@ PYPL, DHI, EQNR, EOG, B, PDD, CVE, UBER, VZ, CMCSA, F, GM, INTC, BAC, WFC, XOM, 
 The eight October 2026 research additions are assigned to the swing-trade bucket at the existing $30,000 per-symbol notional. Screening details, current valuation snapshot, source links, and risks are in `docs/ticker-review-2026-10-27.md`. The daily research automation is intended to re-evaluate this list and keep it at or below 30; it does not place orders or liquidate held positions.
 
 ## Exit policy (paper account only)
-The position manager closes an existing stock position on an 8% adverse move, a 12% favorable move from broker average cost, or two opposing timeframe signals. These are full closes, never automatic reversals or repeated partial trims. It requires verified paper-account positions and open orders, a fresh quote with <=1% spread and within 2% of daily close, US regular session 09:35–15:55 ET, and no pending order. It submits at most one DAY limit close ticket per invocation and awaits order status. The thresholds are decision rules, not resting broker stops; gaps may exceed them. New entries, time-based exits and automated earnings exits are disabled pending approved risk caps and reliable entry/event metadata.
+The position manager closes an existing stock position on an 8% adverse move, a 12% favorable move from broker average cost, or two opposing timeframe signals. These are full closes, never automatic reversals or repeated partial trims. It requires verified paper-account positions and open orders, a fresh quote with <=1% spread and within 2% of daily close, US regular session 09:35–15:55 ET, and no pending order. It submits at most one DAY limit close ticket per invocation and awaits order status. The thresholds are decision rules, not resting broker stops; gaps may exceed them. Unbounded legacy entries, time-based exits and automated earnings exits are disabled. Only the separately capped, tagged Wyckoff pilot can make new long entries.
 
 ## Paper sizing experiment
-`scripts/risk_sizing.py` simulates 0.25% of a supplied USD strategy-capital figure as planned per-trade stop risk. It sizes both long and short candidates by `floor(risk_budget / abs(entry - stop))` and further limits them by remaining gross exposure capacity. This calculator is deliberately not connected to order placement: strategy-owned holdings, the aggregate cap, stop placement, sector/side exposure, slippage and short borrow constraints must be reconciled before new entries can be enabled. A stop is not a guaranteed maximum loss.
+`scripts/risk_sizing.py` simulates 0.25% of a supplied USD strategy-capital figure as planned per-trade stop risk. It sizes both long and short candidates by `floor(risk_budget / abs(entry - stop))` and further limits them by remaining gross exposure capacity. The capped Wyckoff pilot uses this calculator, but its stop is a threshold checked by the recurring exit manager, not a broker stop; sector/side exposure and short borrow constraints are not implemented for additional strategies. A stop is not a guaranteed maximum loss.
+
+## Multiple strategy tests
+See `docs/experiments.md` for the paper-pilot and two shadow experiment definitions. The pilot uses a simulated $80k USD reference, $200 planned risk per trade, a $20k gross virtual-sleeve cap, $2.5k/name and at most two new fills per day. Only unheld long candidates with current, tight quotes may be entered; legacy paper positions are not assigned to this sleeve. Verified fills and broker intents are saved under `~/.openclaw/state/wyckoff-experiments/`, never to the public repository. Intraday momentum and mean reversion run as shadow-only signal checks each scheduled cycle; no virtual fills or broker orders are claimed until their fill/exit simulation is implemented and validated.

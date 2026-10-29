@@ -29,5 +29,15 @@ class ScheduledCheckTests(unittest.TestCase):
     def test_unclassified_failure_remains_failure(self):
         status, _ = self.run_with(Result(2, "position/order inventory changed"))
         self.assertEqual(status, 2)
+    def test_successful_exit_check_runs_one_capped_entry(self):
+        with patch.object(s, "run_script", side_effect=[Result(0, "scan"), Result(0, "No executable exit signals"), Result(0, "SKIP no eligible new experiment candidate"), Result(0, "SHADOW 8 symbols 0 signals")]) as run, contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(s.main(), 0)
+        self.assertEqual(run.call_count, 4)
+        self.assertEqual(run.call_args_list[-2].args, ("experiment_entry.py", ("--auto", "--execute")))
+        self.assertIn("PILOT ENTRY", out.getvalue())
+    def test_exit_order_skips_entry(self):
+        with patch.object(s, "run_script", side_effect=[Result(0, "scan"), Result(0, "ORDER 1 BUY 10")]) as run:
+            self.assertEqual(s.main(), 0)
+        self.assertEqual(run.call_count, 2)
 
 if __name__ == "__main__": unittest.main()
