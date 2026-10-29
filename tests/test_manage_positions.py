@@ -1,5 +1,6 @@
 import sys
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -25,5 +26,25 @@ class ExitPolicyTests(unittest.TestCase):
         ny=ZoneInfo("America/New_York")
         self.assertFalse(m.market_open(datetime(2026,10,28,16,10,tzinfo=ny)))
         self.assertTrue(m.market_open(datetime(2026,10,28,12,0,tzinfo=ny)))
+
+    def test_second_snapshot_uses_new_client_and_blocks_pending_orders(self):
+        class App:
+            def disconnect(self): pass
+        held = {(m.ACCOUNT, "F"): (100, 120, "STK", "USD")}
+        calls = []
+        def snapshot(client_id=78):
+            calls.append(client_id)
+            return App(), held, {} if client_id == 78 else {55: ("F", "Submitted")}
+        bars = [{"c": 100}] * 25
+        with patch.object(m, "broker_snapshot", side_effect=snapshot), \
+             patch.object(m, "download_batch", return_value={"F": bars}), \
+             patch.object(m, "fetch_quotes", return_value=({"F": {"bid": 100, "ask": 100.05}}, None)), \
+             patch.object(m, "quote_quality", return_value=(.0005, "OK")), \
+             patch.object(m.trader, "analyze_wyckoff_multitf", return_value=("NEUTRAL", "", {"daily": "NEUTRAL", "weekly": "NEUTRAL", "monthly": "NEUTRAL"})), \
+             patch.object(m, "market_open", return_value=True), \
+             patch.object(m, "submit_exit") as submit:
+            self.assertEqual(m.run(execute=True), 2)
+            self.assertEqual(calls, [78, 79])
+            submit.assert_not_called()
 
 if __name__ == "__main__": unittest.main()

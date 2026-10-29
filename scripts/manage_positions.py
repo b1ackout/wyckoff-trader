@@ -40,7 +40,7 @@ def market_open(now):
     return ny.year == 2026 and ny.weekday() < 5 and (ny.year, ny.month, ny.day) not in HOLIDAYS_2026 and clock(9, 35) <= ny.time() < clock(15, 55)
 
 
-def broker_snapshot():
+def broker_snapshot(client_id=78):
     app = trader.IBKRApp()
     positions, orders, accounts = {}, {}, []
     positions_done, orders_done, accounts_done = threading.Event(), threading.Event(), threading.Event()
@@ -55,7 +55,7 @@ def broker_snapshot():
     app.positionEnd = positions_done.set
     app.openOrder = open_order
     app.openOrderEnd = orders_done.set
-    app.connect("127.0.0.1", 7497, clientId=78)
+    app.connect("127.0.0.1", 7497, clientId=client_id)
     threading.Thread(target=app.run, daemon=True).start()
     for _ in range(100):
         if app.connected: break
@@ -128,13 +128,13 @@ def run(execute=False):
             print("DRY RUN: no orders submitted"); return 0
         if not market_open(datetime.now(timezone.utc)):
             print("SKIP: outside regular US session 09:35–15:55 ET; no orders"); return 0
-        # Reconcile immediately before any order, and reject changed holdings or pending orders.
-        app.disconnect()
-        app, latest, pending = broker_snapshot()
-        if pending or any(latest.get((ACCOUNT, s)) != positions.get((ACCOUNT, s)) for s, _ in eligible):
-            print("BLOCK: position/order inventory changed"); return 2
         if not eligible:
             print("No executable exit signals"); return 0
+        # Reconcile immediately before any order, and reject changed holdings or pending orders.
+        app.disconnect()
+        app, latest, pending = broker_snapshot(client_id=79)
+        if pending or any(latest.get((ACCOUNT, s)) != positions.get((ACCOUNT, s)) for s, _ in eligible):
+            print("BLOCK: position/order inventory changed"); return 2
         acknowledged = threading.Event()
         expected = [None]
         original_status = app.orderStatus
