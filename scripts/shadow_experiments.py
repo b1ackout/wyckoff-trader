@@ -2,12 +2,24 @@
 """Evaluate two independent signal hypotheses without any brokerage actions."""
 import json
 import statistics
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import yfinance as yf
+from zoneinfo import ZoneInfo
 
 SYMBOLS = ["UBER", "PYPL", "GM", "BAC", "XOM", "CVX", "DHI", "INTC"]
 STATE = Path.home() / ".openclaw/state/wyckoff-experiments"
+
+def fresh_intraday_bar(stamp, now=None):
+    """Require a completed same-session US regular-hours 5m bar, not yesterday's breakout."""
+    now = now or datetime.now(timezone.utc)
+    if stamp is None or stamp.tzinfo is None: return False
+    et = stamp.astimezone(ZoneInfo("America/New_York"))
+    local_now = now.astimezone(ZoneInfo("America/New_York"))
+    age = now - stamp.astimezone(timezone.utc)
+    return (et.date() == local_now.date() and et.weekday() < 5 and
+            9 * 60 + 30 <= et.hour * 60 + et.minute < 16 * 60 and
+            timedelta(minutes=5) <= age <= timedelta(minutes=20))
 
 
 def rsi(closes, periods=14):
@@ -36,9 +48,11 @@ def series(symbols, period, interval):
     for symbol in symbols:
         try:
             frame = data[symbol].dropna(subset=["Close", "High", "Volume"])
-            # Last intraday candle may still be forming; never trade on it.
-            if interval == "5m" and len(frame) > 1: frame = frame.iloc[:-1]
-            out[symbol] = {key: [float(v) for v in frame[key]] for key in ("Close", "High", "Volume")}
+            # Drop only the forming candle. Keep the timestamp to reject previous-day data.
+            if interval == "5m" and len(frame) and datetime.now(timezone.utc) - frame.index[-1].to_pydatetime().astimezone(timezone.utc) < timedelta(minutes=5):
+                frame = frame.iloc[:-1]
+            out[symbol] = {**{key: [float(v) for v in frame[key]] for key in ("Close", "High", "Volume")},
+                           "last_bar": frame.index[-1].to_pydatetime() if len(frame) else None}
         except (KeyError, TypeError):out[symbol] = {}
     return out
 
@@ -51,7 +65,7 @@ def main():
     for symbol in SYMBOLS:
         fast=intraday.get(symbol,{})
         slow=daily.get(symbol,{})
-        if fast and intraday_momentum(fast["Close"],fast["High"],fast["Volume"]):
+        if fast and fresh_intraday_bar(fast.get("last_bar")) and intraday_momentum(fast["Close"],fast["High"],fast["Volume"]):
             observations.append({"at":now,"strategy":"INTRADAY-MOMENTUM","symbol":symbol,"signal":"LONG","reference":fast["Close"][-1],"status":"shadow signal, no order"})
         if slow and daily_mean_reversion(slow["Close"]):
             observations.append({"at":now,"strategy":"MEAN-REVERSION","symbol":symbol,"signal":"LONG","reference":slow["Close"][-1],"status":"shadow signal, no order"})
