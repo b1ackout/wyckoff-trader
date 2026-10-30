@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Paper-only, position-aware exits. No new entries or automatic reversals."""
 import argparse
+import json
 import math
 import sys
 import threading
@@ -15,6 +16,7 @@ import trade_cycle as trader
 from scan_watchlist import download_batch, fetch_quotes, quote_quality
 
 ACCOUNT = "DUO957759"
+MOMENTUM_LEDGER = Path.home() / ".openclaw/state/wyckoff-experiments/momentum.jsonl"
 LOSS_FRACTION = 0.08
 PROFIT_FRACTION = 0.12
 HOLIDAYS_2026 = {(2026, 11, 26), (2026, 12, 25)}
@@ -40,9 +42,33 @@ def market_open(now):
     return ny.year == 2026 and ny.weekday() < 5 and (ny.year, ny.month, ny.day) not in HOLIDAYS_2026 and clock(9, 35) <= ny.time() < clock(15, 55)
 
 
+def momentum_owned(positions):
+    """Reserve momentum-held symbols so the legacy exit manager never closes them."""
+    if not MOMENTUM_LEDGER.exists():
+        return set()
+    rows = [json.loads(line) for line in MOMENTUM_LEDGER.read_text().splitlines() if line.strip()]
+    intent_ids = [row.get("intent_id", row["id"]) for row in rows if row.get("event") == "intent"]
+    if len(intent_ids) != len(set(intent_ids)):
+        raise RuntimeError("duplicate momentum intent; legacy exits blocked pending reconciliation")
+    ids = {row.get("intent_id", row["id"]) for row in rows if row.get("event") == "resolved"}
+    if any(intent_id not in ids for intent_id in intent_ids):
+        raise RuntimeError("unresolved momentum order; legacy exits blocked pending reconciliation")
+    owned = {}
+    for row in rows:
+        if row.get("event") == "fill":
+            symbol = row["symbol"]
+            owned[symbol] = owned.get(symbol, 0) + int(row["qty"]) * (1 if row["side"] == "BUY" else -1)
+    for symbol, qty in owned.items():
+        position = positions.get((ACCOUNT, symbol))
+        if qty < 0 or (qty and (not position or position[0] != qty or position[2:] != ("STK", "USD"))) or (not qty and position):
+            raise RuntimeError("momentum/broker holding mismatch; legacy exits blocked")
+    return {symbol for symbol, qty in owned.items() if qty}
+
+
 def broker_snapshot(client_id=78):
     app = trader.IBKRApp()
     positions, orders, accounts = {}, {}, []
+    errors = []
     positions_done, orders_done, accounts_done = threading.Event(), threading.Event(), threading.Event()
     def account_list(ids):
         accounts.extend(ids.split(",")); accounts_done.set()
@@ -55,6 +81,12 @@ def broker_snapshot(client_id=78):
     app.positionEnd = positions_done.set
     app.openOrder = open_order
     app.openOrderEnd = orders_done.set
+    original_error = app.error
+    def on_error(req_id, code, message, *args):
+        original_error(req_id, code, message, *args)
+        if code not in (2104, 2106, 2158, 2186):
+            errors.append((code, str(message)[:180]))
+    app.error = on_error
     app.connect("127.0.0.1", 7497, clientId=client_id)
     threading.Thread(target=app.run, daemon=True).start()
     for _ in range(100):
@@ -65,6 +97,8 @@ def broker_snapshot(client_id=78):
     app.reqPositions(); app.reqAllOpenOrders()
     if not positions_done.wait(15) or not orders_done.wait(15):
         app.disconnect(); raise RuntimeError("broker position/open-order inventory incomplete")
+    if errors or not app.isConnected():
+        app.disconnect(); raise RuntimeError("broker snapshot API error/disconnect; order state unknown")
     return app, positions, orders
 
 
@@ -96,8 +130,9 @@ def run(execute=False):
         if orders:
             print("BLOCK: broker open orders exist; no new exit submissions")
             return 2
+        reserved = momentum_owned(positions)
         symbols = [s for (acct, s), (qty, cost, sec, currency) in positions.items()
-                   if acct == ACCOUNT and sec == "STK" and currency == "USD" and s in trader.WATCHLIST]
+                   if acct == ACCOUNT and sec == "STK" and currency == "USD" and s in trader.WATCHLIST and s not in reserved]
         if not symbols: return 0
         daily = download_batch(symbols, "3mo", "1d")
         weekly = download_batch(symbols, "1y", "1wk")

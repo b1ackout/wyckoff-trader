@@ -2,6 +2,7 @@
 """Run the paper scan and guarded exits; keep a TWS outage visible without auto-disabling the scheduler."""
 import subprocess
 import sys
+import fcntl
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +22,7 @@ def run_script(name, args=(), timeout=45):
         return None
 
 
-def main():
+def _cycle():
     scan = run_script("scan_watchlist.py")
     if scan is None: return 2
     print("=== READ-ONLY SCAN ===")
@@ -36,6 +37,19 @@ def main():
         # Avoid opening a new experiment position in a cycle that just closed one.
         if "ORDER " in manager.stdout or "ORDER STATUS UNKNOWN" in manager.stdout:
             print("ENTRY_SKIP: broker exit action requires reconciliation first")
+            return 0
+        momentum = run_script("momentum_pilot.py", ("--execute",), timeout=45)
+        if momentum is None: return 2
+        print("=== INTRADAY MOMENTUM PAPER PILOT ===")
+        print(momentum.stdout.strip())
+        if momentum.returncode:
+            if any(reason in momentum.stdout for reason in KNOWN_BROKER_BLOCKS) and "BROKER_ACTION" not in momentum.stdout:
+                print("BROKER_UNAVAILABLE: momentum exit and entry checks were not completed; no momentum order submitted")
+                return 0
+            print("MOMENTUM_FAILED: inspect broker orders and momentum ledger before retrying")
+            return 2
+        if "BROKER_ACTION" in momentum.stdout:
+            print("WYCKOFF_ENTRY_SKIP: momentum broker action requires reconciliation first")
             return 0
         entry = run_script("experiment_entry.py", ("--auto", "--execute"))
         if entry is None: return 2
@@ -63,6 +77,18 @@ def main():
     print("EXIT_MANAGER_FAILED: inspect TWS order state before retrying.")
     print(manager.stderr[-1000:])
     return 2
+
+
+def main():
+    state = Path.home() / ".openclaw/state/wyckoff-experiments"
+    state.mkdir(parents=True, exist_ok=True)
+    with (state / "cycle.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("CYCLE_BUSY: another scheduled paper cycle owns the broker checks; no duplicate cycle")
+            return 0
+        return _cycle()
 
 
 if __name__ == "__main__":
