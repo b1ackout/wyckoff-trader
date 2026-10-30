@@ -36,7 +36,7 @@ class ScheduledCheckTests(unittest.TestCase):
             self.assertEqual(s.main(), 0)
         self.assertEqual(run.call_count, 6)
         self.assertEqual(run.call_args_list[2].args, ("momentum_pilot.py", ("--execute",)))
-        self.assertEqual(run.call_args_list[3].args[0], "mean_reversion_pilot.py")
+        self.assertEqual(run.call_args_list[3].args, ("mean_reversion_pilot.py", ("--execute",)))
         self.assertEqual(run.call_args_list[-2].args, ("experiment_entry.py", ("--auto", "--execute")))
         self.assertIn("PILOT ENTRY", out.getvalue())
     def test_momentum_action_skips_wyckoff_entry(self):

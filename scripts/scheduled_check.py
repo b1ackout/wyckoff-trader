@@ -51,7 +51,7 @@ def _cycle():
         if "BROKER_ACTION" in momentum.stdout:
             print("WYCKOFF_ENTRY_SKIP: momentum broker action requires reconciliation first")
             return 0
-        mean = run_script("mean_reversion_pilot.py", timeout=90)
+        mean = run_script("mean_reversion_pilot.py", ("--execute",), timeout=90)
         if mean is None: return 2
         print("=== MEAN REVERSION PAPER PILOT ===")
         print(mean.stdout.strip())
