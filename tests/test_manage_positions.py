@@ -51,6 +51,14 @@ class ExitPolicyTests(unittest.TestCase):
         with patch.object(m.trader, 'IBKRApp', return_value=App()):
             with self.assertRaisesRegex(RuntimeError,'API error'):
                 m.broker_snapshot(client_id=191)
+    def test_mean_reversion_holding_reserved(self):
+        import json
+        with tempfile.TemporaryDirectory() as root, patch.object(m,"MOMENTUM_LEDGER",Path(root)/"momentum.jsonl"), patch.object(m,"MEAN_REVERSION_LEDGER",Path(root)/"mean_reversion.jsonl"):
+            rows=[{"event":"intent","id":9,"intent_id":"mean-1"},
+                  {"event":"fill","id":9,"symbol":"PYPL","side":"BUY","qty":3},
+                  {"event":"resolved","id":9,"intent_id":"mean-1"}]
+            m.MEAN_REVERSION_LEDGER.write_text("".join(json.dumps(row)+chr(10) for row in rows))
+            self.assertEqual(m.experiment_owned({(m.ACCOUNT,"PYPL"):(3,65,"STK","USD")}), {"PYPL"})
     def test_long_loss_and_profit(self):
         self.assertIn("8%", m.exit_reason(100, 100, 91.99))
         self.assertIn("12%", m.exit_reason(100, 100, 112.01))

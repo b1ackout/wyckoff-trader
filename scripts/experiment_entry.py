@@ -18,8 +18,8 @@ from risk_sizing import proposed_shares
 from scan_watchlist import download_batch, fetch_quotes, quote_quality
 
 CAPITAL = 80000.0  # isolated simulated USD strategy sleeve, not whole IBKR account
-GROSS_CAP = 20000.0
-NAME_CAP = 2500.0
+GROSS_CAP = 80000.0
+NAME_CAP = 10000.0
 STOP_FRACTION = 0.08
 COST_BUFFER = 0.005
 ORDER_REF = "EXP-WYCKOFF-RISK025"

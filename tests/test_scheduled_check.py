@@ -32,10 +32,11 @@ class ScheduledCheckTests(unittest.TestCase):
         status, _ = self.run_with(Result(2, "position/order inventory changed"))
         self.assertEqual(status, 2)
     def test_successful_exit_check_runs_one_capped_entry(self):
-        with patch.object(s, "run_script", side_effect=[Result(0, "scan"), Result(0, "No executable exit signals"), Result(0, "No eligible momentum entry"), Result(0, "SKIP no eligible new experiment candidate"), Result(0, "SHADOW 8 symbols 0 signals")]) as run, contextlib.redirect_stdout(io.StringIO()) as out:
+        with patch.object(s, "run_script", side_effect=[Result(0, "scan"), Result(0, "No executable exit signals"), Result(0, "No eligible momentum entry"), Result(0, "No eligible mean-reversion entry"), Result(0, "SKIP no eligible new experiment candidate"), Result(0, "SHADOW 8 symbols 0 signals")]) as run, contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(s.main(), 0)
-        self.assertEqual(run.call_count, 5)
+        self.assertEqual(run.call_count, 6)
         self.assertEqual(run.call_args_list[2].args, ("momentum_pilot.py", ("--execute",)))
+        self.assertEqual(run.call_args_list[3].args[0], "mean_reversion_pilot.py")
         self.assertEqual(run.call_args_list[-2].args, ("experiment_entry.py", ("--auto", "--execute")))
         self.assertIn("PILOT ENTRY", out.getvalue())
     def test_momentum_action_skips_wyckoff_entry(self):
@@ -46,6 +47,14 @@ class ScheduledCheckTests(unittest.TestCase):
         with patch.object(s, "run_script", side_effect=[Result(0,"scan"), Result(0,"No executable exit signals"), Result(2,"BLOCK unresolved order intent")]) as run:
             self.assertEqual(s.main(), 2)
         self.assertEqual(run.call_count, 3)
+    def test_mean_order_skips_wyckoff_entry(self):
+        with patch.object(s, "run_script", side_effect=[Result(0,"scan"), Result(0,"No executable exit signals"), Result(0,"No eligible momentum entry"), Result(0,"BROKER_ACTION BUY PYPL 2")]) as run:
+            self.assertEqual(s.main(), 0)
+        self.assertEqual(run.call_count, 4)
+    def test_mean_error_blocks_wyckoff_entry(self):
+        with patch.object(s, "run_script", side_effect=[Result(0,"scan"), Result(0,"No executable exit signals"), Result(0,"No eligible momentum entry"), Result(2,"BLOCK unresolved order intent")]) as run:
+            self.assertEqual(s.main(), 2)
+        self.assertEqual(run.call_count, 4)
     def test_exit_order_skips_entry(self):
         with patch.object(s, "run_script", side_effect=[Result(0, "scan"), Result(0, "ORDER 1 BUY 10")]) as run:
             self.assertEqual(s.main(), 0)

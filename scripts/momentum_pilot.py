@@ -19,6 +19,10 @@ STATE = Path.home() / '.openclaw/state/wyckoff-experiments'
 LEDGER = STATE / 'momentum.jsonl'
 REF = 'EXP-INTRADAY-MOMENTUM'
 ET = ZoneInfo('America/New_York')
+CAPITAL = 80000
+GROSS_CAP = 80000
+NAME_CAP = 10000
+RISK_BUDGET = CAPITAL * .0025
 
 
 def append(row):
@@ -82,7 +86,12 @@ def execution_snapshot(app, oid, symbol, side, intent_id):
     done = threading.Event()
     executions = {}
     req_id = 710000 + (uuid.uuid4().int % 1000000)
-    old_detail, old_end = app.execDetails, app.execDetailsEnd
+    old_detail, old_end, old_error = app.execDetails, app.execDetailsEnd, app.error
+    errors = []
+    def on_error(request, code, message, *args):
+        old_error(request, code, message, *args)
+        if code not in (2104, 2106, 2158, 2186):
+            errors.append((request, code))
     def detail(request, contract, execution):
         if request == req_id:
             if (execution.acctNumber == ACCOUNT and execution.orderRef == intent_id
@@ -95,18 +104,18 @@ def execution_snapshot(app, oid, symbol, side, intent_id):
     def end(request):
         if request == req_id: done.set()
         else: old_end(request)
-    app.execDetails, app.execDetailsEnd = detail, end
+    app.execDetails, app.execDetailsEnd, app.error = detail, end, on_error
     try:
         filt = ExecutionFilter()
         filt.acctCode = ACCOUNT
         app.reqExecutions(req_id, filt)
-        if not done.wait(15):
-            raise RuntimeError('execution snapshot incomplete; intent retained')
+        if not done.wait(15) or errors or not app.isConnected():
+            raise RuntimeError('execution snapshot incomplete/API error; intent retained')
         if any(int(q) != q or q <= 0 for q in executions.values()):
             raise RuntimeError('invalid execution quantity; intent retained')
         return sum(int(q) for q in executions.values())
     finally:
-        app.execDetails, app.execDetailsEnd = old_detail, old_end
+        app.execDetails, app.execDetailsEnd, app.error = old_detail, old_end, old_error
 
 
 def submit(app, symbol, side, qty, price, before):
@@ -147,8 +156,10 @@ def submit(app, symbol, side, qty, price, before):
         matched = execution_snapshot(check, oid, symbol, side, intent_id)
         if matched != filled:
             raise RuntimeError('execution/position delta mismatch; intent retained')
-        if not filled and status not in ('Cancelled', 'ApiCancelled'):
-            raise RuntimeError('zero-fill order not terminal; intent retained')
+        if status not in ('Filled', 'Cancelled', 'ApiCancelled'):
+            raise RuntimeError('order status not terminal; intent retained')
+        if status == 'Filled' and filled != qty:
+            raise RuntimeError('Filled status/quantity mismatch; intent retained')
         if filled:
             append({'event': 'fill', 'id': oid, 'intent_id': intent_id, 'symbol': symbol, 'side': side, 'qty': int(filled), 'day': datetime.now(ET).date().isoformat()})
         append({'event': 'resolved', 'id': oid, 'intent_id': intent_id, 'filled': int(filled)})
@@ -202,7 +213,7 @@ def run(execute=False, now=None):
                     continue
                 close = b['Close'][-1]
                 _, ask = quote(symbol, close)
-                qty = min(math.floor(50 / (ask * .02)), math.floor(2500 / (ask * 1.001)), math.floor((20000 - gross) / (ask * 1.001)))
+                qty = min(math.floor(RISK_BUDGET / (ask * .02)), math.floor(NAME_CAP / (ask * 1.001)), math.floor((GROSS_CAP - gross) / (ask * 1.001)))
                 if qty < 1:
                     continue
                 print('ENTRY', symbol, qty, 'ask', ask, 'planned stop', round(ask * .98, 2))
@@ -212,7 +223,7 @@ def run(execute=False, now=None):
                     if pending or latest != positions or not session(datetime.now(timezone.utc)) or datetime.now(ET).time() >= clock(14, 30):
                         raise RuntimeError('changed broker/session before entry')
                     _, ask = quote(symbol, close)
-                    qty = min(qty, math.floor(50 / (ask * .02)), math.floor(2500 / (ask * 1.001)), math.floor((20000 - gross) / (ask * 1.001)))
+                    qty = min(qty, math.floor(RISK_BUDGET / (ask * .02)), math.floor(NAME_CAP / (ask * 1.001)), math.floor((GROSS_CAP - gross) / (ask * 1.001)))
                     if qty:
                         submit(app, symbol, 'BUY', qty, ask, 0)
                 return 0

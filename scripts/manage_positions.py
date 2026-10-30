@@ -17,6 +17,7 @@ from scan_watchlist import download_batch, fetch_quotes, quote_quality
 
 ACCOUNT = "DUO957759"
 MOMENTUM_LEDGER = Path.home() / ".openclaw/state/wyckoff-experiments/momentum.jsonl"
+MEAN_REVERSION_LEDGER = Path.home() / ".openclaw/state/wyckoff-experiments/mean_reversion.jsonl"
 LOSS_FRACTION = 0.08
 PROFIT_FRACTION = 0.12
 HOLIDAYS_2026 = {(2026, 11, 26), (2026, 12, 25)}
@@ -42,11 +43,11 @@ def market_open(now):
     return ny.year == 2026 and ny.weekday() < 5 and (ny.year, ny.month, ny.day) not in HOLIDAYS_2026 and clock(9, 35) <= ny.time() < clock(15, 55)
 
 
-def momentum_owned(positions):
-    """Reserve momentum-held symbols so the legacy exit manager never closes them."""
-    if not MOMENTUM_LEDGER.exists():
+def tagged_owned(positions, ledger):
+    """Reserve tagged holdings so the legacy exit manager never closes them."""
+    if not ledger.exists():
         return set()
-    rows = [json.loads(line) for line in MOMENTUM_LEDGER.read_text().splitlines() if line.strip()]
+    rows = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
     intent_ids = [row.get("intent_id", row["id"]) for row in rows if row.get("event") == "intent"]
     if len(intent_ids) != len(set(intent_ids)):
         raise RuntimeError("duplicate momentum intent; legacy exits blocked pending reconciliation")
@@ -63,6 +64,18 @@ def momentum_owned(positions):
         if qty < 0 or (qty and (not position or position[0] != qty or position[2:] != ("STK", "USD"))) or (not qty and position):
             raise RuntimeError("momentum/broker holding mismatch; legacy exits blocked")
     return {symbol for symbol, qty in owned.items() if qty}
+
+
+def momentum_owned(positions):
+    return tagged_owned(positions, MOMENTUM_LEDGER)
+
+
+def experiment_owned(positions):
+    momentum = momentum_owned(positions)
+    mean = tagged_owned(positions, MEAN_REVERSION_LEDGER)
+    if momentum & mean:
+        raise RuntimeError("multiple experiment owners for one symbol; legacy exits blocked")
+    return momentum | mean
 
 
 def broker_snapshot(client_id=78):
@@ -130,7 +143,7 @@ def run(execute=False):
         if orders:
             print("BLOCK: broker open orders exist; no new exit submissions")
             return 2
-        reserved = momentum_owned(positions)
+        reserved = experiment_owned(positions)
         symbols = [s for (acct, s), (qty, cost, sec, currency) in positions.items()
                    if acct == ACCOUNT and sec == "STK" and currency == "USD" and s in trader.WATCHLIST and s not in reserved]
         if not symbols: return 0

@@ -22,6 +22,8 @@ class PilotTests(unittest.TestCase):
         class App:
             def execDetails(self, *args): pass
             def execDetailsEnd(self, *args): pass
+            def error(self, *args): pass
+            def isConnected(self): return True
             def reqExecutions(self, request, filt):
                 self.assert_account = filt.acctCode
                 contract = SimpleNamespace(symbol='GM', secType='STK', currency='USD')
@@ -43,6 +45,8 @@ class PilotTests(unittest.TestCase):
         class App:
             def execDetails(self, *args): pass
             def execDetailsEnd(self, *args): pass
+            def error(self, *args): pass
+            def isConnected(self): return True
             def reqExecutions(self, request, filt): pass
         with patch.object(m.threading, 'Event') as event:
             event.return_value.wait.return_value = False
@@ -112,6 +116,9 @@ class PilotTests(unittest.TestCase):
             def disconnect(self): pass
         with patch.object(m, 'broker_snapshot', return_value=(App(), {}, {})), patch.object(m, 'session', return_value=False), patch.object(m, 'STATE', Path('/tmp')), patch.object(m, 'LEDGER', Path('/nonexistent-momentum-ledger')):
             self.assertEqual(m.run(False, now), 0)
+
+    def test_independent_eighty_thousand_paper_sleeve(self):
+        self.assertEqual((m.CAPITAL, m.GROSS_CAP, m.NAME_CAP, m.RISK_BUDGET), (80000, 80000, 10000, 200))
 
     def test_default_dry_run_and_ref(self):
         self.assertEqual(m.run.__defaults__[0], False)

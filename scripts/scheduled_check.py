@@ -38,7 +38,7 @@ def _cycle():
         if "ORDER " in manager.stdout or "ORDER STATUS UNKNOWN" in manager.stdout:
             print("ENTRY_SKIP: broker exit action requires reconciliation first")
             return 0
-        momentum = run_script("momentum_pilot.py", ("--execute",), timeout=45)
+        momentum = run_script("momentum_pilot.py", ("--execute",), timeout=90)
         if momentum is None: return 2
         print("=== INTRADAY MOMENTUM PAPER PILOT ===")
         print(momentum.stdout.strip())
@@ -50,6 +50,19 @@ def _cycle():
             return 2
         if "BROKER_ACTION" in momentum.stdout:
             print("WYCKOFF_ENTRY_SKIP: momentum broker action requires reconciliation first")
+            return 0
+        mean = run_script("mean_reversion_pilot.py", timeout=90)
+        if mean is None: return 2
+        print("=== MEAN REVERSION PAPER PILOT ===")
+        print(mean.stdout.strip())
+        if mean.returncode:
+            if any(reason in mean.stdout for reason in KNOWN_BROKER_BLOCKS) and "BROKER_ACTION" not in mean.stdout:
+                print("BROKER_UNAVAILABLE: mean-reversion exit and entry checks were not completed; no mean-reversion order submitted")
+                return 0
+            print("MEAN_REVERSION_FAILED: inspect broker orders and mean-reversion ledger before retrying")
+            return 2
+        if "BROKER_ACTION" in mean.stdout:
+            print("WYCKOFF_ENTRY_SKIP: mean-reversion broker action requires reconciliation first")
             return 0
         entry = run_script("experiment_entry.py", ("--auto", "--execute"))
         if entry is None: return 2
