@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only batch Wyckoff scan for the canonical paper-trading watchlist."""
+"""Read-only batched Wyckoff scan for the canonical 40-name paper-trading watchlist."""
 import io, logging, math, sys, time, warnings
 from contextlib import redirect_stderr
 from datetime import datetime, timezone

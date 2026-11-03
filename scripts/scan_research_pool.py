@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only 40-symbol discovery scan; never modifies the executable 30-name list."""
+"""Read-only full-universe signal scan; never places orders."""
 import sys
 import time
 from datetime import datetime, timezone
@@ -10,13 +10,13 @@ sys.path.insert(0, str(ROOT / 'src'))
 import trade_cycle as trader
 from scan_watchlist import download_batch, fetch_quotes, quote_quality
 
-CANDIDATES = ('AIG', 'ALL', 'PRU', 'HIG', 'C', 'USB', 'PNC', 'MPC', 'MS', 'GS')
+CANDIDATES = tuple(trader.WATCHLIST)
 
 
 def universe():
-    names = list(dict.fromkeys([*trader.WATCHLIST, *CANDIDATES]))
-    if len(names) != len(trader.WATCHLIST) + len(CANDIDATES):
-        raise RuntimeError('research pool unexpectedly overlaps active watchlist')
+    names = list(dict.fromkeys([*CANDIDATES]))
+    if len(names) != len(trader.WATCHLIST):
+        raise RuntimeError('active watchlist contains duplicate symbols')
     return names
 
 
@@ -30,7 +30,7 @@ def run():
         print('RESEARCH_DATA_INCOMPLETE', error or 'missing quote symbols')
         return 2
     print('READ-ONLY RESEARCH', datetime.now(timezone.utc).isoformat(),
-          'names', len(names), 'active', len(trader.WATCHLIST), 'new candidates', len(CANDIDATES))
+          'names', len(names), 'active', len(trader.WATCHLIST))
     print('Three bar timeframes and quote batch seconds', round(time.monotonic() - started, 1))
     missing = []
     for symbol in CANDIDATES:
@@ -44,7 +44,7 @@ def run():
         print(symbol, signal, 'timeframes', '/'.join(frames.get(x,'?') for x in ('daily','weekly','monthly')),
               'quote', quality, 'spread_pct', round(spread * 100, 2) if spread is not None else 'NA')
     if missing: print('INSUFFICIENT_BARS', ','.join(missing))
-    print('RESEARCH ONLY: vendor valuation and issuer filings NOT checked; no orders; no additions to WATCHLIST')
+    print('READ ONLY: vendor valuation and issuer filings NOT checked; no orders placed')
     return 2 if missing else 0
 
 

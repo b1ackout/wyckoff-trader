@@ -15,7 +15,7 @@ class Result:
 
 class ScheduledCheckTests(unittest.TestCase):
     def run_with(self, manager):
-        with patch.object(s, "run_script", side_effect=[Result(0, "30 names scanned"), manager]) as run, contextlib.redirect_stdout(io.StringIO()) as output:
+        with patch.object(s, "run_script", side_effect=[Result(0, "40 names scanned"), manager]) as run, contextlib.redirect_stdout(io.StringIO()) as output:
             status = s.main()
         self.assertEqual(run.call_count, 2)
         self.assertIn("READ-ONLY SCAN", output.getvalue())

@@ -7,7 +7,7 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 
 ## Layout
 - `src/trade_cycle.py` — Wyckoff signal analysis and guarded paper-exit entry point (legacy unbounded entries disabled)
-- `scripts/scan_watchlist.py` — batched, read-only multi-timeframe scan for all 30 watchlist names
+- `scripts/scan_watchlist.py` — batched, read-only multi-timeframe scan for all 40 watchlist names
 - `scripts/manage_positions.py` — position-aware paper exits; dry-run default, `--execute` for guarded exits
 - `scripts/scheduled_check.py` — scheduled scan/exit/pilot-entry wrapper; reports broker outages without disabling future scans
 - `scripts/experiment_entry.py` — tagged, capped paper-only Wyckoff pilot entry (dry-run default; `--auto --execute` for guarded scheduled pilot)
@@ -24,10 +24,10 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 
 The read-only scan batches daily, weekly, and monthly Yahoo Finance bars for the full watchlist, and retrieves Alpaca quotes in one request. This avoids the timeout caused by sequential per-symbol requests. It never places or changes orders.
 
-## Watchlist (30 US-listed names)
-PYPL, DHI, EQNR, EOG, B, PDD, CVE, UBER, VZ, CMCSA, F, GM, INTC, BAC, WFC, XOM, CVX, T, JPM, MO, KHC, PCG, BMY, CI, HPQ, TROW, TRV, CF, PHM, AIZ
+## Watchlist (40 US-listed names)
+PYPL, DHI, EQNR, EOG, B, PDD, CVE, UBER, VZ, CMCSA, F, GM, INTC, BAC, WFC, XOM, CVX, T, JPM, MO, KHC, PCG, BMY, CI, HPQ, TROW, TRV, CF, PHM, AIZ, AIG, ALL, PRU, HIG, C, USB, PNC, MPC, MS, GS
 
-The eight October 2026 research additions are assigned to the swing-trade bucket at the existing $30,000 per-symbol notional. Screening details, current valuation snapshot, source links, and risks are in `docs/ticker-review-2026-10-27.md`. The daily research automation is intended to re-evaluate this list and keep it at or below 30; it does not place orders or liquidate held positions.
+The ten additional paper-trading names (AIG, ALL, PRU, HIG, C, USB, PNC, MPC, MS, GS) are assigned to the swing-trade bucket at the existing $30,000 per-symbol notional. They are experimental candidates; vendor valuation and earnings data are not filing-confirmed. The daily research automation may evaluate up to 40 names and does not place orders or liquidate held positions. Existing per-strategy $80,000 gross caps, $10,000/name caps, $200 planned-risk target, quote/session/order safeguards, and daily fill caps remain unchanged.
 
 ## Exit policy (paper account only)
 The position manager closes an existing stock position on an 8% adverse move, a 12% favorable move from broker average cost, or two opposing timeframe signals. These are full closes, never automatic reversals or repeated partial trims. It requires verified paper-account positions and open orders, a fresh quote with <=1% spread and within 2% of daily close, US regular session 09:35–15:55 ET, and no pending order. It submits at most one DAY limit close ticket per invocation and awaits order status. The thresholds are decision rules, not resting broker stops; gaps may exceed them. Unbounded legacy entries, time-based exits and automated earnings exits are disabled. Only the separately capped, tagged Wyckoff pilot can make new long entries.

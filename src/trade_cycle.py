@@ -21,14 +21,17 @@ ALPACA_DATA_URL = "https://data.alpaca.markets/v2"
 WATCHLIST = ["PYPL", "DHI", "EQNR", "EOG", "B", "PDD", "CVE", "UBER",
              "VZ", "CMCSA", "F", "GM", "INTC", "BAC", "WFC", "XOM",
              "CVX", "T", "JPM", "MO", "KHC", "PCG",
-             "BMY", "CI", "HPQ", "TROW", "TRV", "CF", "PHM", "AIZ"]
+             "BMY", "CI", "HPQ", "TROW", "TRV", "CF", "PHM", "AIZ",
+             "AIG", "ALL", "PRU", "HIG", "C", "USB", "PNC", "MPC", "MS", "GS"]
 
 DAY_TRADE_STOCKS = {"PYPL": 30000, "DHI": 30000, "UBER": 30000, "F": 30000, "GM": 30000, "INTC": 30000}
 SWING_TRADE_STOCKS = {"EQNR": 30000, "EOG": 30000, "B": 30000, "PDD": 30000, "CVE": 30000,
                       "VZ": 30000, "CMCSA": 30000, "BAC": 30000, "WFC": 30000, "XOM": 30000,
                       "CVX": 30000, "T": 30000, "JPM": 30000, "MO": 30000, "KHC": 30000, "PCG": 30000,
                       "BMY": 30000, "CI": 30000, "HPQ": 30000, "TROW": 30000, "TRV": 30000,
-                      "CF": 30000, "PHM": 30000, "AIZ": 30000}
+                      "CF": 30000, "PHM": 30000, "AIZ": 30000,
+                      "AIG": 30000, "ALL": 30000, "PRU": 30000, "HIG": 30000, "C": 30000,
+                      "USB": 30000, "PNC": 30000, "MPC": 30000, "MS": 30000, "GS": 30000}
 
 NOTES_FILE = "/home/deck/.openclaw/workspace/wyckoff_notes.md"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",
