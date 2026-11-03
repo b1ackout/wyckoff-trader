@@ -5,6 +5,10 @@ Automated Wyckoff-method paper-trading bot for the Steam Deck.
 - Bars: yfinance (daily/weekly/monthly)
 - Execution: IBKR TWS Classic on 127.0.0.1:7497 (paper account)
 
+## Monthly paper-account P&L
+
+Read-only daily snapshots are recorded privately at `~/.openclaw/state/wyckoff-pnl/snapshots.jsonl`; monthly summaries use the IBKR base-currency ledger and flag reconciliation gaps. The weekday snapshot automation is scheduled at 22:45 Asia/Jerusalem. See `docs/monthly-pnl-tracking.md` and run `python3 scripts/monthly_pnl_snapshot.py --report YYYY-MM` for a month-to-date summary. Earlier months require IBKR statement backfill.
+
 ## Layout
 - `src/trade_cycle.py` — Wyckoff signal analysis and guarded paper-exit entry point (legacy unbounded entries disabled)
 - `scripts/scan_watchlist.py` — batched, read-only multi-timeframe scan for all 40 watchlist names
