@@ -1,0 +1,9 @@
+# Private paper-trading research store
+
+Run `/home/deck/.openclaw/state/venvs/wyckoff/bin/python3 scripts/research_store.py`. SQLite database: `~/.openclaw/state/wyckoff-research/research.sqlite3` (directory 0700, DB 0600). Scheduled weekdays at 22:40 Asia/Jerusalem before the reported 23:00 TWS shutdown (job `e11910a7-48d3-4536-a14e-708124da83b9`). The script only requests broker executions and historical bars; it cannot submit orders.
+
+`executions`: broker-confirmed individual fills, unique by account and exec ID. Includes instrument, side, share quantity, price, execution timestamp as returned by TWS, order/permanent IDs, order reference and exchange. This is **not** an order-submission log, and execution prices are in the instrument currency; commissions, dividends and cash flows are not included. TWS execution-query history is limited (typically current day), so older fills require IBKR Activity Statements/Flex backfill. A missing row is not evidence there was no trade.
+
+`daily_bars`: yfinance unadjusted OHLCV in USD for the canonical US-stock watchlist, keyed by symbol/date/source. Today's unfinished daily candle is excluded; at the next collection after its session it becomes eligible. These provider bars are research data, not broker-execution prices, and can later be revised by the source; the first saved completed version is retained. The initial download covers approximately three months, not full trading history. Retired symbols are not automatically refreshed; out-of-universe positions need separate backfill.
+
+Query locally using Python sqlite3. No account-level data or database is committed to GitHub. Failed broker connection does not fabricate fills; if the combined job aborts before bar download, retry after connectivity returns. Research should account for source gaps, timezone, corporate actions, revisions and commissions before inferring realized performance.
